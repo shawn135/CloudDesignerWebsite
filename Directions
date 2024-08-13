@@ -1,0 +1,276 @@
+CloudFormation Designer, Creating a Basic Web Server Project
+
+Step 1: Open AWS CloudFormation Designer
+
+Search and Select VPC on left hand side of screen. Drag resource onto grid
+
+The resources are organized by resource categories. All of the resources we're adding are in the EC2 category.
+![alt text](Step1-1.PNG)
+
+AWS CloudFormation Designer immediately modifies your template to include a VPC resource, with the results looking similar to the following JSON snippet. Simple press the template tab.  
+![alt text](templatetab.PNG)
+
+Add a Subnet resource type inside the VPC and rename it PublicSubnet. Select the subnet and modify the name under the logical ID.
+
+We will use the subnet to allocate a range of IP addresses in the VPC that you can associate with other AWS resources, such as an Amazon EC2 instance.
+
+Select the VPC resource and click on Group. Then drag the subnet into the group to associate the two resources.
+
+When you add the subnet inside the VPC, AWS CloudFormation Designer automatically associates the subnet with the VPC. This association is a container model, where resources inside the container are automatically associated with the container resource.  
+![alt text](Step2.PNG)
+
+Add an Instance resource type to the Canvas.
+
+The instance is a virtual computing environment where you'll host a basic website. Similar to the way this worked with the subnet and VPC, adding the instance in the subnet automatically associates the instance with the subnet. You will then select PublicSubnet, select Group to create a second group inside the VPC group, and drag WebServerInstance into Group 2.
+
+![alt text](Step3.PNG)
+
+Add a SecurityGroup resource type inside the VPC and rename it WebServerSecurityGroup.
+
+The security group is a virtual firewall that controls the inbound and outbound traffic of the web server instance. It's also required for instances in a VPC. We'll need to associate the web server instance with this security group, which we'll do later when we specify the instance's properties.
+
+Add an InternetGateway resource type anywhere outside of the VPC
+
+The Internet gateway enables communication between the instance that is inside the VPC and the Internet. Without the Internet gateway, no one can access your website.
+
+Although, you can drag the Internet gateway inside the VPC, this doesn't create an association with the VPC. The Internet gateway doesn't follow the container model.
+
+Create a connection between the InternetGateway resource and the VPC resource.
+
+Search and drag (AWS::EC2::VPCGatewayAttachment) into the VPC group
+
+Select the Template tab, and paste the following code under GatewayAttachment:
+
+AttachGateway: Type: AWS::EC2::VPCGatewayAttachment Properties: VpcId: Ref: VPC InternetGatewayId: Ref: myInternetGateway
+
+Your Canvas should now look like this:
+
+![alt text](Step4.PNG)
+
+Next, we need to add a route table and route to specify how to direct network traffic from within a subnet. Add a EC2:RouteTable inside the VPC and rename it PublicRouteTable. This associates a new route table with the VPC.
+
+To add a routing rule to the route table, add a Route resource type inside the PublicRouteTable resource and rename it PublicRoute.
+
+We'll use the route to specify where to direct traffic.
+
+![alt text](Step5.PNG)
+
+Select PublicRoute, open the details and add the following:
+
+PublicRoute: Type: AWS::EC2::Route Properties: DestinationCidrBlock: 0.0.0.0/0 RouteTableId: !Ref PublicRouteTable GatewayId: !Ref InternetGateway
+
+Next we will create the parameters,mappings, and the outputs sections of our template. Copy and paste the following into the template:
+
+Parameters: InstanceType: Description: WebServer EC2 instance type Type: String Default: t2.small AllowedValues: - t1.micro - t2.nano - t2.micro - t2.small - t2.medium - t2.large - m1.small - m1.medium - m1.large - m1.xlarge - m2.xlarge - m2.2xlarge - m2.4xlarge - m3.medium - m3.large - m3.xlarge - m3.2xlarge - m4.large - m4.xlarge - m4.2xlarge - m4.4xlarge - m4.10xlarge - c1.medium - c1.xlarge - c3.large - c3.xlarge - c3.2xlarge - c3.4xlarge - c3.8xlarge - c4.large - c4.xlarge - c4.2xlarge - c4.4xlarge - c4.8xlarge - g2.2xlarge - g2.8xlarge - r3.large - r3.xlarge - r3.2xlarge - r3.4xlarge - r3.8xlarge - i2.xlarge - i2.2xlarge - i2.4xlarge - i2.8xlarge - d2.xlarge - d2.2xlarge - d2.4xlarge - d2.8xlarge - hi1.4xlarge - hs1.8xlarge - cr1.8xlarge - cc2.8xlarge - cg1.4xlarge ConstraintDescription: must be a valid EC2 instance type. KeyName: Description: Name of an EC2 KeyPair to enable SSH access to the instance. Type: AWS::EC2::KeyPair::KeyName ConstraintDescription: must be the name of an existing EC2 KeyPair. SSHLocation: Description: ' The IP address range that can be used to access the web server using SSH.' Type: String MinLength: '9' MaxLength: '18' Default: 0.0.0.0/0 AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2}) ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x. Mappings: AWSInstanceType2Arch: t2.micro: Arch: HVM64 t2.small: Arch: HVM64 t2.medium: Arch: HVM64 t2.large: Arch: HVM64 AWSRegionArch2AMI: us-east-1: HVM64: ami-0ae8f15ae66fe8cda Outputs: WebsiteURL: Description: URL for newly created LAMP stack Value: !Join - '' - - http:// - !GetAtt WebServerInstance.PublicDnsName
+
+Specify Resource Properties
+
+Select the VPC resource. Click on details and between the brackets paste the following code. This specifies the DNS settings and the CIDR block of the VPC:
+
+    JSON
+
+        "EnableDnsSupport": "true",
+
+        "EnableDnsHostnames": "true",
+
+        "CidrBlock": "10.0.0.0/16"
+
+YAML
+
+      EnableDnsSupport: 'true'
+
+      EnableDnsHostnames: 'true'
+
+      CidrBlock: 10.0.0.0/16
+
+Repeat for the rest of the resources. PublicSubnet:
+
+JSON
+
+        "VpcId": {
+
+          "Ref": "VPC"
+
+        },
+
+        "CidrBlock": "10.0.0.0/24"
+
+YAML
+
+VpcId: !Ref VPC
+
+CidrBlock: 10.0.0.0/24
+
+PublicRoute – adds destination CIDR block property, which directs all traffice to the internet gateway
+
+JSON
+
+        "DestinationCidrBlock": "0.0.0.0/0",
+
+        "RouteTableId": {
+
+          "Ref": "PublicRouteTable"
+
+        },
+
+        "GatewayId": {
+
+          "Ref": "InternetGateway"
+
+        }
+
+YAML
+
+DestinationCidrBlock: 0.0.0.0/0
+
+RouteTableId: !Ref PublicRouteTable
+
+GatewayId: !Ref InternetGateway
+
+WebServerSecurityGroup- inbound rules that allow HTTP and SSH traffic you specify
+
+JSON
+
+        "VpcId": {
+
+          "Ref": "VPC"
+
+        },
+
+        "GroupDescription" : "Allow access from HTTP and SSH traffic",
+
+        "SecurityGroupIngress": [
+
+          {
+
+            "IpProtocol": "tcp",
+
+            "FromPort": 80,
+
+            "ToPort": 80,
+
+            "CidrIp": "0.0.0.0/0"
+
+          },
+
+          {
+
+            "IpProtocol": "tcp",
+
+            "FromPort": 22,
+
+            "ToPort": 22,
+
+            "CidrIp": {
+
+              "Ref": "SSHLocation"
+
+            }
+
+          }
+
+        ]
+
+YAML
+
+VpcId: !Ref VPC
+
+GroupDescription: Allow access from HTTP and SSH traffic
+
+SecurityGroupIngress:
+
+- IpProtocol: tcp
+
+FromPort: 80
+
+ToPort: 80
+
+CidrIp: 0.0.0.0/0
+
+- IpProtocol: tcp
+
+FromPort: 22
+
+ToPort: 22
+
+CidrIp: !Ref SSHLocation
+
+WebServerInstance-
+
+InstanceType: !Ref InstanceType
+
+ImageId: !FindInMap
+
+- AWSRegionArch2AMI
+
+- !Ref AWS::Region
+
+- !FindInMap
+
+  - AWSInstanceType2Arch
+
+  - !Ref InstanceType
+
+  - Arch
+
+KeyName: !Ref KeyName
+
+NetworkInterfaces:
+
+- GroupSet:
+
+  - !Ref WebSecurityGroup
+
+  AssociatePublicIpAddress: true
+
+  DeviceIndex: '0'
+
+  DeleteOnTermination: true
+
+  SubnetId: !Ref PublicSubnet
+
+UserData: !Base64
+
+Fn::Sub: |
+
+    #!/bin/bash -xe
+
+    yum install -y aws-cfn-bootstrap
+
+    # Install the files and packages from the metadata
+
+    /opt/aws/bin/cfn-init -v \
+
+        --stack ${AWS::StackName} \
+
+        --resource WebServerInstance \
+
+        --configsets All \
+
+        --region ${AWS::Region}
+
+    # Signal the status from cfn-init
+
+    /opt/aws/bin/cfn-signal -e $? \
+
+        --stack ${AWS::StackName} \
+
+        --resource WebServerInstance \
+
+        --region ${AWS::Region}
+
+![alt text](step6.PNG)
+
+Now you can save the template on your local machine or AWS will create an S3 bucket to store the template. In CloudFormation create the stack. You only need to upload the template. The creation will take several mins.
+
+Troubleshoot: My stack created 2 route tables. I had to delete one, and associate the remaining route table to the internet gateway and the private subnet. Afterwards I logged into the Ec2 instance through ssh and installed the following:
+
+sudo yum install httpd –y
+
+sudo systemctl start httpd
+
+sudo systemctl enable httpd
+
+sudo systemctl status httpd
+
+Go to your Ec2 instance in the console and the URL should know display your website.
